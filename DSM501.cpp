@@ -1,63 +1,57 @@
-#include "DSM501.h"
+#include "SDM501.h"
 
-DSM501::DSM501(int pin, userfunc interruptDispatch)
-{
-    _pin = pin;
-    _interruptDispatch = interruptDispatch;
-    _bootMillis = millis();
-    _lastReadPmMillis = _bootMillis;
-    pinMode(_pin, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(_pin), _interruptDispatch, CHANGE);
+SDM501::SDM501(int pin, userfunc interruptDispatch) {
+  _pin = pin;
+  _interruptDispatch = interruptDispatch;
+  _bootMillis = millis();
+  _lastReadPmMillis = _bootMillis;
+  _lastState = LOW;
+  _lastMicros = micros();
+  _lowPulseTotalMicros = 0;
+  pinMode(_pin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(_pin), _interruptDispatch, CHANGE);
 }
 
-bool DSM501::isReady()
-{
-    unsigned long currentMillis = millis();
-    return currentMillis - _bootMillis > DSM501_WARMUP_TIME;
+bool SDM501::isReady() {
+  unsigned long currentMillis = millis();
+  return currentMillis - _bootMillis > SDM501_WARMUP_TIME;
 }
 
-int DSM501::getReadyCountdown()
-{
-    unsigned long currentMillis = millis();
-    return (int)((DSM501_WARMUP_TIME - currentMillis + _bootMillis) / 1000);
+int SDM501::getReadyCountdown() {
+  unsigned long currentMillis = millis();
+  unsigned long elapsedMillis = currentMillis - _bootMillis;
+  return (int)((SDM501_WARMUP_TIME - elapsedMillis) / 1000);
 }
 
-void DSM501::handleInterrupt()
-{
-    byte state = digitalRead(_pin);
+void SDM501::handleInterrupt() {
+  byte state = digitalRead(_pin);
 
-    // On rising edge: report pulse length.
-    if (_lastState == LOW && state == HIGH)
-    {
-        unsigned long lowPulseMicros = micros() - _lastMicros;
-        _lowPulseTotalMicros += lowPulseMicros;
-        _lastState = HIGH;
+  if (_lastState != state) {
+    if (state == HIGH) { // Rising edge
+      _lowPulseMicros = micros() - _lastMicros;
+    } else { // Falling edge
+      _lastMicros = micros();
+      _lowPulseTotalMicros += _lowPulseMicros;
     }
-    // On falling edge: record current time.
-    if (_lastState == HIGH && state == LOW)
-    {
-        _lastMicros = micros();
-        _lastState = LOW;
-    }
+    _lastState = state;
+  }
 }
 
-float DSM501::readPM()
-{
-    if (!isReady())
-    {
-        return 0.0;
-    }
-    unsigned long currentMillis = millis();
-    unsigned long interval = currentMillis - _lastReadPmMillis;
-    float ratio = _lowPulseTotalMicros / (interval * 10.0);
-    float concentration = ratio * ratio * ratio * 1.1 - ratio * ratio * 3.8 + ratio * 520 + 0.62;
-    if (interval < 3600000UL)
-    {
-        concentration *= (interval / 3600000.0);
-    }
+float SDM501::readPM() {
+  if (!isReady()) {
+    return 0.0;
+  }
 
-    _lowPulseTotalMicros = 0;
-    _lastReadPmMillis = currentMillis;
+  unsigned long currentMillis = millis();
+  unsigned long elapsedMillis = currentMillis - _lastReadPmMillis;
+  _lastReadPmMillis = currentMillis;
 
-    return concentration;
+  float ratio = _lowPulseTotalMicros / (elapsedMillis * 10.0);
+  float concentration = ratio * ratio * ratio * 1.1 - ratio * ratio * 3.8 + ratio * 520 + 0.62;
+  if (elapsedMillis < 3600000UL) {
+    concentration *= (elapsedMillis / 3600000.0);
+  }
+
+  _lowPulseTotalMicros = 0;
+  return concentration;
 }
