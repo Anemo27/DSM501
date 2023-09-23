@@ -1,6 +1,7 @@
-#include "SDM501.h"
+#include "DSM501.h"
 
-SDM501::SDM501(int pin, userfunc interruptDispatch) {
+DSM501::DSM501(int pin, userfunc interruptDispatch)
+{
   _pin = pin;
   _interruptDispatch = interruptDispatch;
   _bootMillis = millis();
@@ -12,24 +13,31 @@ SDM501::SDM501(int pin, userfunc interruptDispatch) {
   attachInterrupt(digitalPinToInterrupt(_pin), _interruptDispatch, CHANGE);
 }
 
-bool SDM501::isReady() {
+bool DSM501::isReady()
+{
   unsigned long currentMillis = millis();
-  return currentMillis - _bootMillis > SDM501_WARMUP_TIME;
+  return currentMillis - _bootMillis > DSM501_WARMUP_TIME;
 }
 
-int SDM501::getReadyCountdown() {
+int DSM501::getReadyCountdown()
+{
   unsigned long currentMillis = millis();
   unsigned long elapsedMillis = currentMillis - _bootMillis;
-  return (int)((SDM501_WARMUP_TIME - elapsedMillis) / 1000);
+  return (int)((DSM501_WARMUP_TIME - elapsedMillis) / 1000);
 }
 
-void SDM501::handleInterrupt() {
+void DSM501::handleInterrupt()
+{
   byte state = digitalRead(_pin);
 
-  if (_lastState != state) {
-    if (state == HIGH) { // Rising edge
+  if (_lastState != state)
+  {
+    if (state == HIGH)
+    { // Rising edge
       _lowPulseMicros = micros() - _lastMicros;
-    } else { // Falling edge
+    }
+    else
+    { // Falling edge
       _lastMicros = micros();
       _lowPulseTotalMicros += _lowPulseMicros;
     }
@@ -37,8 +45,10 @@ void SDM501::handleInterrupt() {
   }
 }
 
-float SDM501::readPM() {
-  if (!isReady()) {
+float DSM501::readPM()
+{
+  if (!isReady())
+  {
     return 0.0;
   }
 
@@ -48,7 +58,8 @@ float SDM501::readPM() {
 
   float ratio = _lowPulseTotalMicros / (elapsedMillis * 10.0);
   float concentration = ratio * ratio * ratio * 1.1 - ratio * ratio * 3.8 + ratio * 520 + 0.62;
-  if (elapsedMillis < 3600000UL) {
+  if (elapsedMillis < 3600000UL)
+  {
     concentration *= (elapsedMillis / 3600000.0);
   }
 
